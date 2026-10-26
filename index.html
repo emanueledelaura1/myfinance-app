@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Gestione Finanziaria Personale</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#7c3aed" />
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MyFinance" />
+<script>
+  (function () {
+    try {
+      var saved = localStorage.getItem('finanza.theme');
+      var theme = saved || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+<link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-icon">💰</span>
+        <span class="brand-name">MyFinance</span>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">📊</span> Dashboard
+        </button>
+        <button class="nav-item" data-view="transactions">
+          <span class="nav-icon">💳</span> Transazioni
+        </button>
+        <button class="nav-item" data-view="accounts">
+          <span class="nav-icon">🏦</span> Conti
+        </button>
+        <button class="nav-item" data-view="budget">
+          <span class="nav-icon">🎯</span> Budget
+        </button>
+        <button class="nav-item" data-view="profession">
+          <span class="nav-icon">💼</span> Professione
+        </button>
+        <button class="nav-item" data-view="investments">
+          <span class="nav-icon">📈</span> Investimenti
+        </button>
+        <button class="nav-item" data-view="recurring">
+          <span class="nav-icon">📅</span> Ricorrenti
+        </button>
+        <button class="nav-item" data-view="bank">
+          <span class="nav-icon">🔗</span> Banca
+        </button>
+        <button class="nav-item" data-view="sync">
+          <span class="nav-icon">☁️</span> Sincronizzazione
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="theme-toggle-btn" class="ghost-btn theme-toggle-btn">🌙 Tema scuro</button>
+        <button id="export-btn" class="ghost-btn">Esporta dati</button>
+        <button id="import-btn" class="ghost-btn">Importa dati</button>
+        <input type="file" id="import-file" accept="application/json" hidden />
+      </div>
+    </aside>
+
+    <main class="content">
+      <!-- DASHBOARD -->
+      <section id="view-dashboard" class="view active">
+        <header class="view-header">
+          <h1>Dashboard</h1>
+          <p class="subtitle" id="dashboard-month-label"></p>
+        </header>
+
+        <div class="cards-row">
+          <div class="card stat-card">
+            <span class="stat-label">Saldo totale</span>
+            <span class="stat-value" id="stat-total-balance">€0,00</span>
+          </div>
+          <div class="card stat-card income">
+            <span class="stat-label">Entrate (mese)</span>
+            <span class="stat-value" id="stat-month-income">€0,00</span>
+          </div>
+          <div class="card stat-card expense">
+            <span class="stat-label">Uscite (mese)</span>
+            <span class="stat-value" id="stat-month-expense">€0,00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Risparmio (mese)</span>
+            <span class="stat-value" id="stat-month-net">€0,00</span>
+          </div>
+        </div>
+
+        <div class="cards-row charts-row">
+          <div class="card chart-card">
+            <h3>Spese per categoria (mese corrente)</h3>
+            <canvas id="chart-category"></canvas>
+            <p class="empty-hint" id="chart-category-empty">Nessuna spesa registrata questo mese.</p>
+          </div>
+          <div class="card chart-card">
+            <h3>Andamento ultimi 6 mesi</h3>
+            <canvas id="chart-trend"></canvas>
+          </div>
+        </div>
+
+        <div class="cards-row">
+          <div class="card chart-card full-width">
+            <h3>Budget vs Spesa reale (mese corrente)</h3>
+            <canvas id="chart-budget"></canvas>
+            <p class="empty-hint" id="chart-budget-empty">Nessun budget impostato per questo mese.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <h3>Ultime transazioni</h3>
+            <button class="link-btn" data-view-link="transactions">Vedi tutte →</button>
+          </div>
+          <div id="recent-transactions-list" class="transactions-list"></div>
+        </div>
+      </section>
+
+      <!-- TRANSACTIONS -->
+      <section id="view-transactions" class="view">
+        <header class="view-header">
+          <h1>Transazioni</h1>
+          <div class="header-actions">
+            <button class="ghost-btn" id="import-csv-btn">📄 Importa estratto conto</button>
+            <button class="primary-btn" id="add-transaction-btn">+ Nuova transazione</button>
+          </div>
+        </header>
+
+        <div class="card filters-card">
+          <div class="filters-row">
+            <select id="filter-account"><option value="">Tutti i conti</option></select>
+            <select id="filter-category"><option value="">Tutte le categorie</option></select>
+            <select id="filter-type">
+              <option value="">Tutti i tipi</option>
+              <option value="income">Entrate</option>
+              <option value="expense">Uscite</option>
+            </select>
+            <select id="filter-scope">
+              <option value="">Tutti gli ambiti</option>
+              <option value="personal">Personale</option>
+              <option value="professional">Professionale</option>
+            </select>
+            <input type="month" id="filter-month" />
+            <button class="ghost-btn" id="clear-filters-btn">Pulisci filtri</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div id="all-transactions-list" class="transactions-list"></div>
+          <p class="empty-hint" id="transactions-empty">Nessuna transazione trovata.</p>
+        </div>
+      </section>
+
+      <!-- ACCOUNTS -->
+      <section id="view-accounts" class="view">
+        <header class="view-header">
+          <h1>Conti</h1>
+          <button class="primary-btn" id="add-account-btn">+ Nuovo conto</button>
+        </header>
+        <div class="cards-row" id="accounts-grid"></div>
+      </section>
+
+      <!-- BUDGET -->
+      <section id="view-budget" class="view">
+        <header class="view-header">
+          <h1>Budget mensile</h1>
+          <input type="month" id="budget-month" />
+        </header>
+        <div class="card">
+          <div id="budget-list" class="budget-list"></div>
+        </div>
+      </section>
+
+      <!-- PROFESSION -->
+      <section id="view-profession" class="view">
+        <header class="view-header">
+          <h1>Professione</h1>
+          <select id="profession-year"></select>
+        </header>
+
+        <div class="card settings-card">
+          <h3>Impostazioni regime forfettario</h3>
+          <p class="settings-hint">Valori indicativi e semplificati: verifica sempre coefficiente e aliquote aggiornate con il tuo commercialista.</p>
+          <div class="settings-grid">
+            <label>Coefficiente di redditività
+              <select id="profession-coefficient-preset">
+                <option value="78">78% – Professioni, tecnici, sanità</option>
+                <option value="67">67% – Altre attività economiche</option>
+                <option value="86">86% – Costruzioni e immobiliare</option>
+                <option value="62">62% – Intermediari di commercio</option>
+                <option value="54">54% – Alloggio e ristorazione</option>
+                <option value="40">40% – Commercio</option>
+                <option value="custom">Personalizzato</option>
+              </select>
+              <input type="number" id="profession-coefficient-value" min="0" max="100" step="1" />
+            </label>
+            <label>Aliquota imposta sostitutiva
+              <select id="profession-tax-rate">
+                <option value="5">5% – Primi 5 anni (start-up)</option>
+                <option value="15">15% – Regime ordinario forfettario</option>
+              </select>
+            </label>
+            <label>Aliquota contributi previdenziali
+              <select id="profession-inps-preset">
+                <option value="26.07">26,07% – Gestione Separata INPS</option>
+                <option value="24">24% – Artigiani e Commercianti</option>
+                <option value="19.5">19,5% – ENPAM Quota B (indicativo)</option>
+                <option value="custom">Personalizzato</option>
+              </select>
+              <input type="number" id="profession-inps-value" min="0" max="100" step="0.01" />
+            </label>
+          </div>
+        </div>
+
+        <div class="cards-row">
+          <div class="card stat-card income">
+            <span class="stat-label">Fatturato (anno)</span>
+            <span class="stat-value" id="profession-revenue">€0,00</span>
+            <span class="account-interest-auto-label" id="profession-revenue-breakdown"></span>
+          </div>
+          <div class="card stat-card expense">
+            <span class="stat-label">Spese professionali (anno)</span>
+            <span class="stat-value" id="profession-expenses">€0,00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Reddito imponibile stimato</span>
+            <span class="stat-value" id="profession-taxable">€0,00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Utile netto stimato</span>
+            <span class="stat-value" id="profession-net">€0,00</span>
+          </div>
+        </div>
+
+        <div class="cards-row">
+          <div class="card stat-card expense">
+            <span class="stat-label">Contributi INPS stimati</span>
+            <span class="stat-value" id="profession-inps">€0,00</span>
+          </div>
+          <div class="card stat-card expense">
+            <span class="stat-label">Imposta sostitutiva stimata</span>
+            <span class="stat-value" id="profession-tax">€0,00</span>
+          </div>
+          <div class="card stat-card expense full-width">
+            <span class="stat-label">Totale da accantonare (tasse + contributi)</span>
+            <span class="stat-value" id="profession-total-due">€0,00</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <h3>Soglia regime forfettario</h3>
+          </div>
+          <div class="budget-bar-track"><div class="budget-bar-fill" id="profession-threshold-fill"></div></div>
+          <p class="empty-hint" id="profession-threshold-label" style="display:block;"></p>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <h3>Transazioni professionali</h3>
+            <button class="primary-btn" id="add-profession-transaction-btn">+ Nuova transazione professionale</button>
+          </div>
+          <div id="profession-transactions-list" class="transactions-list"></div>
+          <p class="empty-hint" id="profession-transactions-empty">Nessuna transazione professionale per questo periodo.</p>
+        </div>
+      </section>
+
+      <!-- INVESTMENTS -->
+      <section id="view-investments" class="view">
+        <header class="view-header">
+          <h1>Investimenti</h1>
+          <div class="header-actions">
+            <span class="subtitle" id="investments-last-update"></span>
+            <button class="ghost-btn" id="refresh-prices-btn">🔄 Aggiorna prezzi</button>
+            <button class="primary-btn" id="add-investment-btn">+ Aggiungi titolo</button>
+          </div>
+        </header>
+
+        <div class="card settings-card">
+          <h3>Chiave API Twelve Data (azioni/ETF)</h3>
+          <p class="settings-hint">
+            Richiesta solo per le quotazioni di azioni/ETF in tempo reale. Le criptovalute non ne hanno bisogno.
+            Puoi ottenerne una gratuita su <a href="https://twelvedata.com/pricing" target="_blank" rel="noopener">twelvedata.com</a> (piano Free, nessuna carta richiesta).
+          </p>
+          <div class="settings-grid">
+            <label>Chiave API
+              <input type="text" id="twelvedata-key" placeholder="Incolla qui la tua chiave API" />
+            </label>
+          </div>
+        </div>
+
+        <div class="cards-row">
+          <div class="card stat-card">
+            <span class="stat-label">Valore portafoglio</span>
+            <span class="stat-value" id="invest-total-value">€0,00</span>
+          </div>
+          <div class="card stat-card">
+            <span class="stat-label">Costo totale investito</span>
+            <span class="stat-value" id="invest-total-cost">€0,00</span>
+          </div>
+          <div class="card stat-card" id="invest-gain-card">
+            <span class="stat-label">Guadagno / Perdita</span>
+            <span class="stat-value" id="invest-total-gain">€0,00</span>
+          </div>
+          <div class="card stat-card" id="invest-gain-pct-card">
+            <span class="stat-label">Rendimento</span>
+            <span class="stat-value" id="invest-total-gain-pct">0,00%</span>
+          </div>
+        </div>
+
+        <div class="card chart-card">
+          <h3>Allocazione portafoglio</h3>
+          <canvas id="chart-allocation"></canvas>
+          <p class="empty-hint" id="chart-allocation-empty">Nessun titolo in portafoglio.</p>
+        </div>
+
+        <div class="card">
+          <div class="section-header">
+            <h3>Titoli in portafoglio</h3>
+          </div>
+          <div id="investments-table" class="investments-table"></div>
+          <p class="empty-hint" id="investments-empty">Nessun titolo aggiunto. Inizia aggiungendo una criptovaluta o un'azione.</p>
+        </div>
+      </section>
+
+      <!-- RECURRING -->
+      <section id="view-recurring" class="view">
+        <header class="view-header">
+          <h1>Transazioni ricorrenti</h1>
+          <button class="primary-btn" id="add-recurring-btn">+ Nuova ricorrenza</button>
+        </header>
+        <p class="settings-hint">Spese o entrate che si ripetono (affitto, abbonamenti, stipendio…). Vengono generate automaticamente come transazioni quando raggiungono la data di scadenza, ogni volta che apri l'app.</p>
+
+        <div class="card">
+          <div id="recurring-list" class="recurring-list"></div>
+          <p class="empty-hint" id="recurring-empty">Nessuna transazione ricorrente configurata.</p>
+        </div>
+      </section>
+
+      <!-- BANK (Open Banking) -->
+      <section id="view-bank" class="view">
+        <header class="view-header">
+          <h1>Collegamento bancario</h1>
+        </header>
+        <p class="settings-hint">
+          Collega i tuoi conti bancari reali (PSD2/Open Banking) tramite GoCardless Bank Account Data per importare
+          automaticamente i movimenti, senza inserirli a mano. Richiede il backend locale <code>BankSync</code> avviato sul tuo PC.
+        </p>
+
+        <div class="card settings-card">
+          <h3>Indirizzo backend locale</h3>
+          <div class="settings-grid">
+            <label>URL BankSync
+              <input type="text" id="bank-sync-url" placeholder="http://localhost:5190" />
+            </label>
+          </div>
+          <p class="empty-hint" id="bank-status-label" style="display:block;"></p>
+        </div>
+
+        <div class="card" id="bank-institutions-card" style="display:none;">
+          <div class="section-header">
+            <h3>Collega una nuova banca</h3>
+          </div>
+          <div class="filters-row">
+            <input type="text" id="bank-institution-search" placeholder="Cerca la tua banca (es. Intesa, Unicredit...)" />
+          </div>
+          <div id="bank-institutions-list" class="recurring-list"></div>
+        </div>
+
+        <div class="card" id="bank-connections-card" style="display:none;">
+          <div class="section-header">
+            <h3>Collegamenti</h3>
+            <button class="ghost-btn" id="refresh-connections-btn">🔄 Aggiorna stato</button>
+          </div>
+          <div id="bank-connections-list" class="recurring-list"></div>
+          <p class="empty-hint" id="bank-connections-empty">Nessuna banca collegata.</p>
+        </div>
+      </section>
+
+      <!-- SYNC (multi-dispositivo) -->
+      <section id="view-sync" class="view">
+        <header class="view-header">
+          <h1>Sincronizzazione</h1>
+        </header>
+        <p class="settings-hint">
+          Collega un account gratuito Firebase per avere automaticamente gli stessi dati su più dispositivi
+          (es. telefono e PC). I dati restano tuoi: solo tu, con il tuo accesso, puoi leggerli e scriverli.
+        </p>
+
+        <div class="card" id="sync-config-card">
+          <h3>1. Configurazione Firebase</h3>
+          <p class="settings-hint">Incolla qui l'oggetto <code>firebaseConfig</code> dalla console Firebase (Impostazioni progetto → Le tue app → app Web).</p>
+          <textarea id="sync-config-input" rows="6" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "...", ...}'></textarea>
+          <div class="modal-actions">
+            <span></span>
+            <button type="button" class="primary-btn" id="sync-save-config-btn">Salva configurazione</button>
+          </div>
+        </div>
+
+        <div class="card" id="sync-login-card" style="display:none;">
+          <h3>2. Accedi o registrati</h3>
+          <label>Email
+            <input type="email" id="sync-email" />
+          </label>
+          <label>Password
+            <input type="password" id="sync-password" />
+          </label>
+          <p class="empty-hint" id="sync-auth-error" style="display:none;"></p>
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" id="sync-change-config-btn">Cambia configurazione</button>
+            <span style="display:flex; gap:8px;">
+              <button type="button" class="ghost-btn" id="sync-signup-btn">Registrati</button>
+              <button type="button" class="primary-btn" id="sync-signin-btn">Accedi</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="card" id="sync-status-card" style="display:none;">
+          <h3>✅ Sincronizzazione attiva</h3>
+          <p class="settings-hint">Connesso come <strong id="sync-user-email"></strong>.</p>
+          <p class="empty-hint" id="sync-last-update" style="display:block;"></p>
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" id="sync-signout-btn">Esci</button>
+            <button type="button" class="primary-btn" id="sync-now-btn">Sincronizza ora</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- MODAL: Transaction -->
+  <div class="modal-overlay" id="transaction-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="transaction-modal-title">Nuova transazione</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+      <form id="transaction-form">
+        <input type="hidden" id="transaction-id" />
+        <div class="scope-toggle">
+          <button type="button" class="scope-option active" data-scope="personal">👤 Personale</button>
+          <button type="button" class="scope-option" data-scope="professional">💼 Professionale</button>
+        </div>
+        <div class="type-toggle">
+          <button type="button" class="type-option active" data-type="expense">Uscita</button>
+          <button type="button" class="type-option" data-type="income">Entrata</button>
+        </div>
+        <label>Importo (€)
+          <input type="number" id="transaction-amount" step="0.01" min="0.01" required />
+        </label>
+        <label>Conto
+          <select id="transaction-account" required></select>
+        </label>
+        <label>Categoria
+          <select id="transaction-category" required></select>
+        </label>
+        <label class="checkbox-label" id="exclude-contributions-field" style="display:none;">
+          <input type="checkbox" id="transaction-exclude-contributions" />
+          Contributi previdenziali già versati da un sostituto d'imposta
+        </label>
+        <p class="settings-hint" id="exclude-contributions-hint" style="display:none;">
+          Es. cedolino guardia medica: l'ENPAM/INPS è già trattenuto dall'ASL. Su questa entrata verrà calcolata solo l'imposta sostitutiva, non i contributi previdenziali.
+        </p>
+        <label>Data
+          <input type="date" id="transaction-date" required />
+        </label>
+        <label>Nota (opzionale)
+          <input type="text" id="transaction-note" maxlength="200" />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="delete-transaction-btn" style="display:none;">Elimina</button>
+          <button type="submit" class="primary-btn">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Account -->
+  <div class="modal-overlay" id="account-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="account-modal-title">Nuovo conto</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+      <form id="account-form">
+        <input type="hidden" id="account-id" />
+        <label>Nome conto
+          <input type="text" id="account-name" maxlength="40" required />
+        </label>
+        <label>Tipo
+          <select id="account-type">
+            <option value="bank">Banca</option>
+            <option value="cash">Contanti</option>
+            <option value="card">Carta</option>
+            <option value="other">Altro</option>
+          </select>
+        </label>
+        <label>Saldo iniziale (€)
+          <input type="number" id="account-balance" step="0.01" required />
+        </label>
+        <label>Tasso di interesse annuo (%) <span class="label-hint">opzionale, per conti deposito</span>
+          <input type="number" id="account-interest-rate" step="0.01" min="0" placeholder="es. 2.5" />
+        </label>
+        <label>Accredito automatico interessi
+          <select id="account-interest-frequency">
+            <option value="none">Nessuno (solo manuale)</option>
+            <option value="daily">Giornaliero</option>
+            <option value="annual">Annuale</option>
+          </select>
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="delete-account-btn" style="display:none;">Elimina</button>
+          <button type="submit" class="primary-btn">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Credit Interest -->
+  <div class="modal-overlay" id="interest-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Accredita interessi</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+      <form id="interest-form">
+        <input type="hidden" id="interest-account-id" />
+        <p class="settings-hint" id="interest-account-summary"></p>
+        <div class="type-toggle">
+          <button type="button" class="interest-period-option active" data-period="annual">Interesse annuo</button>
+          <button type="button" class="interest-period-option" data-period="daily">Interesse giornaliero</button>
+        </div>
+        <label>Importo da accreditare (€)
+          <input type="number" id="interest-amount" step="0.01" min="0" required />
+        </label>
+        <label>Data
+          <input type="date" id="interest-date" required />
+        </label>
+        <div class="modal-actions">
+          <span></span>
+          <button type="submit" class="primary-btn">Accredita</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Investment -->
+  <div class="modal-overlay" id="investment-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="investment-modal-title">Nuovo titolo</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+      <form id="investment-form">
+        <input type="hidden" id="investment-id" />
+        <div class="scope-toggle">
+          <button type="button" class="asset-option active" data-asset-type="crypto">🪙 Crypto</button>
+          <button type="button" class="asset-option" data-asset-type="stock">📈 Azione / ETF</button>
+        </div>
+
+        <div id="crypto-fields">
+          <label>Criptovaluta
+            <select id="investment-crypto-select"></select>
+          </label>
+          <label id="crypto-custom-field" style="display:none;">ID CoinGecko personalizzato
+            <input type="text" id="investment-crypto-custom" placeholder="es. bitcoin" />
+          </label>
+        </div>
+
+        <div id="stock-fields" style="display:none;">
+          <label>Simbolo (ticker Twelve Data)
+            <input type="text" id="investment-stock-symbol" placeholder="es. AAPL, MSFT, ENEL.MI" />
+          </label>
+        </div>
+
+        <label>Nome visualizzato
+          <input type="text" id="investment-name" maxlength="60" placeholder="es. Bitcoin" required />
+        </label>
+        <label>Quantità
+          <input type="number" id="investment-quantity" step="0.00000001" min="0.00000001" required />
+        </label>
+        <label>Prezzo medio di carico per unità (€)
+          <input type="number" id="investment-avg-cost" step="0.01" min="0" required />
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="delete-investment-btn" style="display:none;">Elimina</button>
+          <button type="submit" class="primary-btn">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: Recurring Transaction -->
+  <div class="modal-overlay" id="recurring-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="recurring-modal-title">Nuova ricorrenza</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+      <form id="recurring-form">
+        <input type="hidden" id="recurring-id" />
+        <label>Nome
+          <input type="text" id="recurring-name" maxlength="60" placeholder="es. Affitto, Netflix, Stipendio" required />
+        </label>
+        <div class="scope-toggle">
+          <button type="button" class="recurring-scope-option active" data-scope="personal">👤 Personale</button>
+          <button type="button" class="recurring-scope-option" data-scope="professional">💼 Professionale</button>
+        </div>
+        <div class="type-toggle">
+          <button type="button" class="recurring-type-option active" data-type="expense">Uscita</button>
+          <button type="button" class="recurring-type-option" data-type="income">Entrata</button>
+        </div>
+        <label>Importo (€)
+          <input type="number" id="recurring-amount" step="0.01" min="0.01" required />
+        </label>
+        <label>Conto
+          <select id="recurring-account" required></select>
+        </label>
+        <label>Categoria
+          <select id="recurring-category" required></select>
+        </label>
+        <label>Frequenza
+          <select id="recurring-frequency">
+            <option value="monthly">Mensile</option>
+            <option value="yearly">Annuale</option>
+          </select>
+        </label>
+        <label>Prossima scadenza
+          <input type="date" id="recurring-next-date" required />
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="recurring-active" checked /> Attiva
+        </label>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="delete-recurring-btn" style="display:none;">Elimina</button>
+          <button type="submit" class="primary-btn">Salva</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: CSV Statement Import -->
+  <div class="modal-overlay" id="csv-import-modal">
+    <div class="modal" style="max-width: 560px;">
+      <div class="modal-header">
+        <h2>Importa estratto conto</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+
+      <div id="csv-import-step1">
+        <label>Conto di destinazione
+          <select id="csv-import-account"></select>
+        </label>
+        <label>File (CSV, Excel .xlsx/.xls)
+          <input type="file" id="csv-import-file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        </label>
+        <p class="settings-hint">Il file deve avere un'intestazione nella prima riga (es. Data, Descrizione, Importo). Funziona con i CSV e i fogli Excel esportati dalla maggior parte delle banche italiane.</p>
+        <div class="modal-actions">
+          <span></span>
+          <button type="button" class="primary-btn" id="csv-import-analyze-btn">Analizza file</button>
+        </div>
+      </div>
+
+      <div id="csv-import-step2" style="display:none;">
+        <label id="csv-sheet-select-field" style="display:none;">Foglio di lavoro
+          <select id="csv-sheet-select"></select>
+        </label>
+        <label>Riga di intestazione (dove si trovano i nomi delle colonne)
+          <input type="number" id="csv-header-row" min="1" value="1" />
+        </label>
+        <p class="settings-hint">Rilevata automaticamente. Se l'anteprima sotto non è corretta, molti estratti conto hanno alcune righe informative prima della vera tabella: prova a cambiare questo numero.</p>
+        <div class="settings-grid" id="csv-mapping-grid">
+          <label>Colonna Data
+            <select id="csv-col-date"></select>
+          </label>
+          <label>Colonna Descrizione
+            <select id="csv-col-desc"></select>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="csv-two-columns" /> Colonne separate Entrata/Uscita
+          </label>
+          <label id="csv-col-amount-field">Colonna Importo
+            <select id="csv-col-amount"></select>
+          </label>
+          <label id="csv-col-credit-field" style="display:none;">Colonna Entrata (Avere)
+            <select id="csv-col-credit"></select>
+          </label>
+          <label id="csv-col-debit-field" style="display:none;">Colonna Uscita (Dare)
+            <select id="csv-col-debit"></select>
+          </label>
+        </div>
+        <h3>Anteprima</h3>
+        <div id="csv-preview-table" class="investments-table"></div>
+        <p class="empty-hint" id="csv-preview-summary" style="display:block;"></p>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="csv-import-back-btn">Indietro</button>
+          <button type="button" class="primary-btn" id="csv-import-confirm-btn">Importa transazioni</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="assets/db.js"></script>
+  <script src="assets/charts.js"></script>
+  <script src="assets/invest.js"></script>
+  <script src="assets/sync.js"></script>
+  <script src="assets/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
