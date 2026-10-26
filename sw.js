@@ -1,5 +1,5 @@
 // Service worker: rende l'app installabile e utilizzabile offline.
-const CACHE_VERSION = 'myfinance-v3';
+const CACHE_VERSION = 'myfinance-v4';
 const APP_SHELL = [
   './',
   './index.html',

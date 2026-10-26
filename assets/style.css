@@ -350,6 +350,26 @@ body {
   .settings-grid { grid-template-columns: 1fr; }
 }
 
+/* Screenshot import */
+.screenshot-row {
+  display: grid;
+  grid-template-columns: 120px 1fr 110px 90px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.screenshot-row input, .screenshot-row select {
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 13px;
+  width: 100%;
+}
+@media (max-width: 640px) {
+  .screenshot-row { grid-template-columns: 1fr 1fr; }
+}
+
 /* Investments */
 .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .header-actions .subtitle { margin: 0; }

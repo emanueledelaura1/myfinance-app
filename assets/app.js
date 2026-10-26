@@ -1799,6 +1799,185 @@
     }
   });
 
+  // ---------- Screenshot Import (OCR, client-side) ----------
+  const screenshotImportModal = document.getElementById('screenshot-import-modal');
+  let screenshotRows = [];
+
+  function openScreenshotImportModal() {
+    const accounts = DB.getAccounts();
+    if (accounts.length === 0) {
+      showToast('Crea prima almeno un conto.');
+      return;
+    }
+    document.getElementById('screenshot-import-step1').style.display = 'block';
+    document.getElementById('screenshot-import-step2').style.display = 'none';
+    document.getElementById('screenshot-import-file').value = '';
+    document.getElementById('screenshot-ocr-progress').style.display = 'none';
+    populateAccountSelect(document.getElementById('screenshot-import-account'), accounts[0].id);
+    screenshotImportModal.classList.add('visible');
+  }
+
+  function closeScreenshotImportModal() {
+    screenshotImportModal.classList.remove('visible');
+  }
+
+  document.getElementById('import-screenshot-btn').addEventListener('click', openScreenshotImportModal);
+  screenshotImportModal.querySelector('.close-modal').addEventListener('click', closeScreenshotImportModal);
+  screenshotImportModal.addEventListener('click', (e) => { if (e.target === screenshotImportModal) closeScreenshotImportModal(); });
+
+  function parseScreenshotDateToken(line, todayStr) {
+    if (/\boggi\b/i.test(line)) return todayStr;
+    if (/\bieri\b/i.test(line)) {
+      const d = new Date(`${todayStr}T00:00:00`);
+      d.setDate(d.getDate() - 1);
+      return d.toISOString().slice(0, 10);
+    }
+    const m = line.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+    if (m) {
+      const day = m[1].padStart(2, '0');
+      const month = m[2].padStart(2, '0');
+      let year = m[3] || todayStr.slice(0, 4);
+      if (year.length === 2) year = `20${year}`;
+      if (Number(month) >= 1 && Number(month) <= 12 && Number(day) >= 1 && Number(day) <= 31) {
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return null;
+  }
+
+  function parseScreenshotText(text) {
+    const AMOUNT_RE = /[+-]?\s*€?\s*\d+(?:\.\d{3})*,\d{2}\s*€?/;
+    const todayStr = todayISO();
+    const lines = text.split('\n').map((l) => l.trim()).filter((l) => l.length > 0);
+
+    const candidates = [];
+    let lastDate = null;
+    let lastTextLine = '';
+
+    lines.forEach((line) => {
+      const dateToken = parseScreenshotDateToken(line, todayStr);
+      if (dateToken) lastDate = dateToken;
+
+      const amountMatch = line.match(AMOUNT_RE);
+      if (amountMatch && lastDate) {
+        const amount = parseItalianAmount(amountMatch[0]);
+        if (!Number.isNaN(amount) && amount !== 0) {
+          let description = line
+            .replace(amountMatch[0], '')
+            .replace(/\b\d{1,2}[\/\-.]\d{1,2}(?:[\/\-.]\d{2,4})?\b/, '')
+            .replace(/\boggi\b|\bieri\b/i, '')
+            .trim();
+          if (!description) description = lastTextLine || 'Transazione';
+          candidates.push({ date: lastDate, amount, description });
+        }
+      } else if (!amountMatch && line.length > 2 && !dateToken) {
+        lastTextLine = line;
+      }
+    });
+
+    return candidates;
+  }
+
+  document.getElementById('screenshot-import-analyze-btn').addEventListener('click', async () => {
+    const file = document.getElementById('screenshot-import-file').files[0];
+    if (!file) { showToast('Seleziona uno screenshot.'); return; }
+
+    const progressEl = document.getElementById('screenshot-ocr-progress');
+    const analyzeBtn = document.getElementById('screenshot-import-analyze-btn');
+    progressEl.style.display = 'block';
+    progressEl.textContent = 'Avvio riconoscimento testo…';
+    analyzeBtn.disabled = true;
+
+    try {
+      const { data } = await Tesseract.recognize(file, 'ita+eng', {
+        logger: (m) => {
+          if (m.status && typeof m.progress === 'number') {
+            progressEl.textContent = `${m.status}… ${Math.round(m.progress * 100)}%`;
+          }
+        },
+      });
+      screenshotRows = parseScreenshotText(data.text || '');
+      renderScreenshotPreview();
+      document.getElementById('screenshot-import-step1').style.display = 'none';
+      document.getElementById('screenshot-import-step2').style.display = 'block';
+    } catch (err) {
+      showToast('Errore nel riconoscimento del testo. Prova con un\'immagine più nitida.');
+    } finally {
+      progressEl.style.display = 'none';
+      analyzeBtn.disabled = false;
+    }
+  });
+
+  function renderScreenshotPreview() {
+    const container = document.getElementById('screenshot-preview-rows');
+    container.innerHTML = screenshotRows.map((r, i) => `
+      <div class="screenshot-row" data-index="${i}">
+        <input type="date" class="sr-date" value="${r.date || ''}" />
+        <input type="text" class="sr-desc" value="${escapeHtml(r.description || '')}" placeholder="Descrizione" />
+        <input type="number" step="0.01" class="sr-amount" value="${r.amount}" />
+        <select class="sr-type">
+          <option value="expense" ${r.amount < 0 ? 'selected' : ''}>Uscita</option>
+          <option value="income" ${r.amount >= 0 ? 'selected' : ''}>Entrata</option>
+        </select>
+        <button type="button" class="icon-btn sr-remove" title="Rimuovi">🗑️</button>
+      </div>
+    `).join('');
+
+    container.querySelectorAll('.sr-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = Number(btn.closest('.screenshot-row').dataset.index);
+        screenshotRows.splice(idx, 1);
+        renderScreenshotPreview();
+      });
+    });
+
+    document.getElementById('screenshot-preview-summary').textContent =
+      screenshotRows.length > 0
+        ? `${screenshotRows.length} operazioni riconosciute. Controlla e correggi prima di importare.`
+        : 'Nessuna operazione riconosciuta automaticamente: puoi aggiungerle a mano con "+ Aggiungi riga".';
+  }
+
+  document.getElementById('screenshot-add-row-btn').addEventListener('click', () => {
+    screenshotRows.push({ date: todayISO(), description: '', amount: 0 });
+    renderScreenshotPreview();
+  });
+
+  document.getElementById('screenshot-import-back-btn').addEventListener('click', () => {
+    document.getElementById('screenshot-import-step1').style.display = 'block';
+    document.getElementById('screenshot-import-step2').style.display = 'none';
+  });
+
+  document.getElementById('screenshot-import-confirm-btn').addEventListener('click', () => {
+    const accountId = document.getElementById('screenshot-import-account').value;
+    const rowEls = document.querySelectorAll('#screenshot-preview-rows .screenshot-row');
+    const transactions = [];
+
+    rowEls.forEach((rowEl, i) => {
+      const date = rowEl.querySelector('.sr-date').value;
+      const description = rowEl.querySelector('.sr-desc').value.trim();
+      const amountInput = Number(rowEl.querySelector('.sr-amount').value);
+      const type = rowEl.querySelector('.sr-type').value;
+      if (!date || Number.isNaN(amountInput) || amountInput === 0) return;
+      const externalId = simpleHash(`${date}|${Math.abs(amountInput)}|${description}|${type}|${i}`);
+      transactions.push({
+        externalId,
+        date,
+        description: description || 'Transazione',
+        type,
+        amount: Math.abs(amountInput),
+      });
+    });
+
+    if (transactions.length === 0) { showToast('Nessuna transazione valida da importare.'); return; }
+
+    const imported = DB.importBankTransactions(accountId, transactions);
+    showToast(imported > 0
+      ? `${imported} transazioni importate.`
+      : 'Nessuna nuova transazione (sembrano già importate).');
+    closeScreenshotImportModal();
+    refreshCurrentView();
+  });
+
   // ---------- Export / Import ----------
   document.getElementById('export-btn').addEventListener('click', () => {
     const data = DB.exportData();

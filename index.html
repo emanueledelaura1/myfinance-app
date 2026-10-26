@@ -127,6 +127,7 @@
           <h1>Transazioni</h1>
           <div class="header-actions">
             <button class="ghost-btn" id="import-csv-btn">📄 Importa estratto conto</button>
+            <button class="ghost-btn" id="import-screenshot-btn">📷 Importa da screenshot</button>
             <button class="primary-btn" id="add-transaction-btn">+ Nuova transazione</button>
           </div>
         </header>
@@ -705,10 +706,49 @@
     </div>
   </div>
 
+  <!-- MODAL: Screenshot Import -->
+  <div class="modal-overlay" id="screenshot-import-modal">
+    <div class="modal" style="max-width: 640px;">
+      <div class="modal-header">
+        <h2>Importa da screenshot</h2>
+        <button class="icon-btn close-modal">✕</button>
+      </div>
+
+      <div id="screenshot-import-step1">
+        <label>Conto di destinazione
+          <select id="screenshot-import-account"></select>
+        </label>
+        <label>Screenshot (immagine dei movimenti)
+          <input type="file" id="screenshot-import-file" accept="image/*" />
+        </label>
+        <p class="settings-hint">Funziona meglio con screenshot nitidi, non troppo zoomati, con data/descrizione/importo ben leggibili. Dopo l'analisi potrai correggere ogni riga prima di confermare.</p>
+        <p class="empty-hint" id="screenshot-ocr-progress" style="display:none;"></p>
+        <div class="modal-actions">
+          <span></span>
+          <button type="button" class="primary-btn" id="screenshot-import-analyze-btn">Analizza immagine</button>
+        </div>
+      </div>
+
+      <div id="screenshot-import-step2" style="display:none;">
+        <div class="section-header">
+          <h3>Correggi e conferma</h3>
+          <button type="button" class="ghost-btn" id="screenshot-add-row-btn">+ Aggiungi riga</button>
+        </div>
+        <p class="empty-hint" id="screenshot-preview-summary" style="display:block;"></p>
+        <div id="screenshot-preview-rows"></div>
+        <div class="modal-actions">
+          <button type="button" class="ghost-btn" id="screenshot-import-back-btn">Indietro</button>
+          <button type="button" class="primary-btn" id="screenshot-import-confirm-btn">Importa transazioni</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
