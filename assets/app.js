@@ -1631,25 +1631,11 @@
   // ---------- Sync (multi-dispositivo, Firebase) ----------
   let syncHookRegistered = false;
 
-  // Configurazione Firebase precaricata: non è un segreto (la sicurezza la fanno
-  // le regole di Firestore, legate all'utente autenticato), quindi è sicuro
-  // includerla qui così chiunque riceva l'app può registrarsi subito.
-  const DEFAULT_FIREBASE_CONFIG = {
-    apiKey: 'AIzaSyDsYO3vNnN928_liZFHVQwwOfzCtUmOiV0',
-    authDomain: 'myfinance-a2ceb.firebaseapp.com',
-    projectId: 'myfinance-a2ceb',
-    storageBucket: 'myfinance-a2ceb.firebasestorage.app',
-    messagingSenderId: '313033264558',
-    appId: '1:313033264558:web:cf81a6ebb4707257facc3f',
-    measurementId: 'G-10QC8NTQ2G',
-  };
-
+  // Ogni persona che usa l'app DEVE configurare il proprio progetto Firebase:
+  // nessuna configurazione condivisa precaricata, per garantire che i dati di
+  // ciascuno restino sul proprio account, mai su quello di qualcun altro.
   function getSyncConfig() {
-    return DB.getApiSettings().firebaseConfig || DEFAULT_FIREBASE_CONFIG;
-  }
-
-  function isUsingCustomConfig() {
-    return !!DB.getApiSettings().firebaseConfig;
+    return DB.getApiSettings().firebaseConfig || null;
   }
 
   function parseFirebaseConfigInput(text) {
@@ -1680,12 +1666,13 @@
     return (err && map[err.code]) || (err && err.message) || 'Errore di autenticazione.';
   }
 
-  function renderSyncView(showAdvancedConfig) {
+  function renderSyncView(forceShowConfig) {
+    const config = getSyncConfig();
     const configCard = document.getElementById('sync-config-card');
     const loginCard = document.getElementById('sync-login-card');
     const statusCard = document.getElementById('sync-status-card');
 
-    if (showAdvancedConfig) {
+    if (!config || forceShowConfig) {
       const current = DB.getApiSettings().firebaseConfig;
       document.getElementById('sync-config-input').value = current ? JSON.stringify(current, null, 2) : '';
       configCard.style.display = 'block';
@@ -1721,6 +1708,7 @@
 
   function initializeSync() {
     const config = getSyncConfig();
+    if (!config) { renderSyncView(); return; }
     if (!Sync.isAvailable()) { renderSyncView(); return; }
     if (!Sync.isInitialized()) {
       try {
@@ -1757,6 +1745,16 @@
   document.getElementById('sync-show-advanced-btn').addEventListener('click', () => renderSyncView(true));
   document.getElementById('sync-cancel-config-btn').addEventListener('click', () => renderSyncView());
 
+  document.getElementById('copy-rules-btn').addEventListener('click', async () => {
+    const text = document.getElementById('firestore-rules-block').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast('Regole copiate negli appunti.');
+    } catch (e) {
+      showToast('Impossibile copiare automaticamente: seleziona e copia il testo manualmente.');
+    }
+  });
+
   document.getElementById('sync-save-config-btn').addEventListener('click', () => {
     try {
       const config = parseFirebaseConfigInput(document.getElementById('sync-config-input').value);
@@ -1766,12 +1764,6 @@
     } catch (err) {
       showToast(err.message);
     }
-  });
-
-  document.getElementById('sync-use-default-btn').addEventListener('click', () => {
-    DB.setApiSettings({ firebaseConfig: null });
-    showToast('Configurazione predefinita ripristinata. Ricarica la pagina per applicarla.');
-    renderSyncView();
   });
 
   document.getElementById('sync-signup-btn').addEventListener('click', async () => {

@@ -350,6 +350,30 @@ body {
   .settings-grid { grid-template-columns: 1fr; }
 }
 
+/* Tutorial / setup guide */
+.tutorial-steps {
+  margin: 0 0 16px;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.tutorial-steps li { font-size: 13px; line-height: 1.5; }
+.tutorial-steps a { color: var(--primary); font-weight: 600; }
+.tutorial-steps code { background: var(--primary-light); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+
+.code-block {
+  background: #1e1b2e;
+  color: #e5e0ff;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-x: auto;
+  white-space: pre;
+  margin: 0 0 10px;
+}
+
 /* Screenshot import */
 .screenshot-row {
   display: grid;

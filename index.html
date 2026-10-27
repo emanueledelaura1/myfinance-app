@@ -395,7 +395,7 @@
 
         <div class="card" id="sync-login-card" style="display:none;">
           <h3>Accedi o crea il tuo account</h3>
-          <p class="settings-hint">Crea un account gratuito (solo tuo, protetto da password) per salvare e sincronizzare i tuoi dati. Se altri usano questa stessa app, ognuno crea il proprio account: i dati restano privati e separati.</p>
+          <p class="settings-hint">Crea un account gratuito (solo tuo, protetto da password) per salvare e sincronizzare i tuoi dati sul <strong>tuo</strong> progetto Firebase.</p>
           <label>Email
             <input type="email" id="sync-email" />
           </label>
@@ -404,7 +404,7 @@
           </label>
           <p class="empty-hint" id="sync-auth-error" style="display:none;"></p>
           <div class="modal-actions">
-            <button type="button" class="ghost-btn" id="sync-show-advanced-btn">⚙️ Configurazione avanzata</button>
+            <button type="button" class="ghost-btn" id="sync-show-advanced-btn">Modifica configurazione Firebase</button>
             <span style="display:flex; gap:8px;">
               <button type="button" class="ghost-btn" id="sync-signup-btn">Crea account</button>
               <button type="button" class="primary-btn" id="sync-signin-btn">Accedi</button>
@@ -413,16 +413,57 @@
         </div>
 
         <div class="card" id="sync-config-card" style="display:none;">
-          <h3>Configurazione avanzata</h3>
-          <p class="settings-hint">Per usare un tuo progetto Firebase personale invece di quello predefinito: incolla qui l'oggetto <code>firebaseConfig</code> dalla console Firebase (Impostazioni progetto → Le tue app → app Web).</p>
+          <h3>1. Crea il tuo progetto Firebase personale</h3>
+          <p class="settings-hint">
+            Ogni persona che usa questa app deve avere il <strong>proprio</strong> progetto Firebase gratuito —
+            mai quello di qualcun altro. I tuoi dati resteranno solo tuoi, su un account che controlli tu.
+            Richiede circa 5 minuti, nessuna carta di credito.
+          </p>
+
+          <ol class="tutorial-steps">
+            <li>
+              Vai su <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a>,
+              accedi con un account Google e crea un <strong>nuovo progetto</strong> (puoi disattivare Google Analytics, non serve).
+            </li>
+            <li>
+              Nel menu a sinistra → <strong>Build → Firestore Database</strong> → "Crea database" → scegli una location
+              vicina (es. <code>eur3</code>) → avvia in <strong>modalità test</strong>.
+            </li>
+            <li>
+              Nel menu a sinistra → <strong>Build → Authentication</strong> → "Inizia" → abilita il provider
+              <strong>Email/Password</strong>.
+            </li>
+            <li>
+              Icona ingranaggio ⚙️ in alto → <strong>Impostazioni progetto</strong> → in basso, sezione "Le tue app" →
+              icona Web <strong>&lt;/&gt;</strong> → dai un nome all'app → "Registra app".
+            </li>
+            <li>
+              Comparirà un blocco <code>firebaseConfig = { ... }</code>: copialo per intero e incollalo qui sotto.
+            </li>
+          </ol>
+
           <textarea id="sync-config-input" rows="6" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "...", ...}'></textarea>
+
           <div class="modal-actions">
-            <button type="button" class="ghost-btn" id="sync-use-default-btn">Usa configurazione predefinita</button>
-            <span style="display:flex; gap:8px;">
-              <button type="button" class="ghost-btn" id="sync-cancel-config-btn">Annulla</button>
-              <button type="button" class="primary-btn" id="sync-save-config-btn">Salva e usa questa</button>
-            </span>
+            <button type="button" class="ghost-btn" id="sync-cancel-config-btn">Annulla</button>
+            <button type="button" class="primary-btn" id="sync-save-config-btn">Salva configurazione</button>
           </div>
+
+          <h3 style="margin-top:24px;">2. Proteggi i tuoi dati (importante!)</h3>
+          <p class="settings-hint">
+            Prima di usarla con i tuoi dati veri, nella console Firebase vai su
+            <strong>Firestore Database → Regole</strong> e sostituisci tutto con questo testo, poi premi "Pubblica".
+            Senza questo passaggio, in modalità test chiunque potrebbe leggere i dati — con queste regole, solo tu:
+          </p>
+          <pre class="code-block" id="firestore-rules-block">rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read, write: if request.auth != null &amp;&amp; request.auth.uid == userId;
+    }
+  }
+}</pre>
+          <button type="button" class="ghost-btn" id="copy-rules-btn">📋 Copia regole</button>
         </div>
 
         <div class="card" id="sync-status-card" style="display:none;">
