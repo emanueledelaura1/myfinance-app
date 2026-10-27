@@ -1631,8 +1631,25 @@
   // ---------- Sync (multi-dispositivo, Firebase) ----------
   let syncHookRegistered = false;
 
+  // Configurazione Firebase precaricata: non è un segreto (la sicurezza la fanno
+  // le regole di Firestore, legate all'utente autenticato), quindi è sicuro
+  // includerla qui così chiunque riceva l'app può registrarsi subito.
+  const DEFAULT_FIREBASE_CONFIG = {
+    apiKey: 'AIzaSyDsYO3vNnN928_liZFHVQwwOfzCtUmOiV0',
+    authDomain: 'myfinance-a2ceb.firebaseapp.com',
+    projectId: 'myfinance-a2ceb',
+    storageBucket: 'myfinance-a2ceb.firebasestorage.app',
+    messagingSenderId: '313033264558',
+    appId: '1:313033264558:web:cf81a6ebb4707257facc3f',
+    measurementId: 'G-10QC8NTQ2G',
+  };
+
   function getSyncConfig() {
-    return DB.getApiSettings().firebaseConfig || null;
+    return DB.getApiSettings().firebaseConfig || DEFAULT_FIREBASE_CONFIG;
+  }
+
+  function isUsingCustomConfig() {
+    return !!DB.getApiSettings().firebaseConfig;
   }
 
   function parseFirebaseConfigInput(text) {
@@ -1663,21 +1680,22 @@
     return (err && map[err.code]) || (err && err.message) || 'Errore di autenticazione.';
   }
 
-  function renderSyncView() {
-    const config = getSyncConfig();
+  function renderSyncView(showAdvancedConfig) {
     const configCard = document.getElementById('sync-config-card');
     const loginCard = document.getElementById('sync-login-card');
     const statusCard = document.getElementById('sync-status-card');
 
-    if (!config) {
+    if (showAdvancedConfig) {
+      const current = DB.getApiSettings().firebaseConfig;
+      document.getElementById('sync-config-input').value = current ? JSON.stringify(current, null, 2) : '';
       configCard.style.display = 'block';
       loginCard.style.display = 'none';
       statusCard.style.display = 'none';
       return;
     }
+    configCard.style.display = 'none';
 
     const user = Sync.isInitialized() ? Sync.getCurrentUser() : null;
-    configCard.style.display = 'none';
     if (user) {
       loginCard.style.display = 'none';
       statusCard.style.display = 'block';
@@ -1703,7 +1721,6 @@
 
   function initializeSync() {
     const config = getSyncConfig();
-    if (!config) { renderSyncView(); return; }
     if (!Sync.isAvailable()) { renderSyncView(); return; }
     if (!Sync.isInitialized()) {
       try {
@@ -1737,21 +1754,23 @@
     renderSyncView();
   }
 
+  document.getElementById('sync-show-advanced-btn').addEventListener('click', () => renderSyncView(true));
+  document.getElementById('sync-cancel-config-btn').addEventListener('click', () => renderSyncView());
+
   document.getElementById('sync-save-config-btn').addEventListener('click', () => {
     try {
       const config = parseFirebaseConfigInput(document.getElementById('sync-config-input').value);
       DB.setApiSettings({ firebaseConfig: config });
-      initializeSync();
-      showToast('Configurazione salvata.');
+      showToast('Configurazione salvata. Ricarica la pagina per applicarla.');
+      renderSyncView();
     } catch (err) {
       showToast(err.message);
     }
   });
 
-  document.getElementById('sync-change-config-btn').addEventListener('click', () => {
-    Sync.stopListening();
+  document.getElementById('sync-use-default-btn').addEventListener('click', () => {
     DB.setApiSettings({ firebaseConfig: null });
-    document.getElementById('sync-config-input').value = '';
+    showToast('Configurazione predefinita ripristinata. Ricarica la pagina per applicarla.');
     renderSyncView();
   });
 

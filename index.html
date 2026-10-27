@@ -393,18 +393,9 @@
           (es. telefono e PC). I dati restano tuoi: solo tu, con il tuo accesso, puoi leggerli e scriverli.
         </p>
 
-        <div class="card" id="sync-config-card">
-          <h3>1. Configurazione Firebase</h3>
-          <p class="settings-hint">Incolla qui l'oggetto <code>firebaseConfig</code> dalla console Firebase (Impostazioni progetto → Le tue app → app Web).</p>
-          <textarea id="sync-config-input" rows="6" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "...", ...}'></textarea>
-          <div class="modal-actions">
-            <span></span>
-            <button type="button" class="primary-btn" id="sync-save-config-btn">Salva configurazione</button>
-          </div>
-        </div>
-
         <div class="card" id="sync-login-card" style="display:none;">
-          <h3>2. Accedi o registrati</h3>
+          <h3>Accedi o crea il tuo account</h3>
+          <p class="settings-hint">Crea un account gratuito (solo tuo, protetto da password) per salvare e sincronizzare i tuoi dati. Se altri usano questa stessa app, ognuno crea il proprio account: i dati restano privati e separati.</p>
           <label>Email
             <input type="email" id="sync-email" />
           </label>
@@ -413,10 +404,23 @@
           </label>
           <p class="empty-hint" id="sync-auth-error" style="display:none;"></p>
           <div class="modal-actions">
-            <button type="button" class="ghost-btn" id="sync-change-config-btn">Cambia configurazione</button>
+            <button type="button" class="ghost-btn" id="sync-show-advanced-btn">⚙️ Configurazione avanzata</button>
             <span style="display:flex; gap:8px;">
-              <button type="button" class="ghost-btn" id="sync-signup-btn">Registrati</button>
+              <button type="button" class="ghost-btn" id="sync-signup-btn">Crea account</button>
               <button type="button" class="primary-btn" id="sync-signin-btn">Accedi</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="card" id="sync-config-card" style="display:none;">
+          <h3>Configurazione avanzata</h3>
+          <p class="settings-hint">Per usare un tuo progetto Firebase personale invece di quello predefinito: incolla qui l'oggetto <code>firebaseConfig</code> dalla console Firebase (Impostazioni progetto → Le tue app → app Web).</p>
+          <textarea id="sync-config-input" rows="6" placeholder='{"apiKey": "...", "authDomain": "...", "projectId": "...", ...}'></textarea>
+          <div class="modal-actions">
+            <button type="button" class="ghost-btn" id="sync-use-default-btn">Usa configurazione predefinita</button>
+            <span style="display:flex; gap:8px;">
+              <button type="button" class="ghost-btn" id="sync-cancel-config-btn">Annulla</button>
+              <button type="button" class="primary-btn" id="sync-save-config-btn">Salva e usa questa</button>
             </span>
           </div>
         </div>
